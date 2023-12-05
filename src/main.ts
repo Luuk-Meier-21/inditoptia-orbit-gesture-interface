@@ -1,4 +1,13 @@
-import * as THREE from "three";
+import * as threeDebug from "three";
+import {
+  Mesh,
+  MeshBasicMaterial,
+  PerspectiveCamera,
+  Scene,
+  SphereGeometry,
+  Vector3,
+  WebGLRenderer,
+} from "three";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
 
 const SPHERE_RADIUS = 15;
@@ -24,8 +33,8 @@ function getAngle(event: TouchEvent & {rotation?: number}): [number, number] {
 }
 
 function main() {
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(
+  const scene = new Scene();
+  const camera = new PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,
     0.1,
@@ -35,18 +44,20 @@ function main() {
 
   // camera.up.set(0, 0, 1); // <=== spin around Z-axis
 
-  const renderer = new THREE.WebGLRenderer();
+  const renderer = new WebGLRenderer();
   renderer.setSize(window.innerWidth, window.innerHeight);
 
   const canvas = document.body.appendChild(renderer.domElement);
   const controls = setupControls(camera, canvas);
-  const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, 32, 16);
-  const material = new THREE.MeshBasicMaterial({
+  const geometry = new SphereGeometry(SPHERE_RADIUS, 32, 16);
+  console.log(geometry.getAttribute("position"));
+
+  const material = new MeshBasicMaterial({
     color: 0xff4f00,
     wireframe: true,
   });
 
-  const sphere = new THREE.Mesh(geometry, material);
+  const sphere = new Mesh(geometry, material);
   scene.add(sphere);
 
   canvas.addEventListener("touchstart", (event) => {
@@ -75,14 +86,9 @@ function main() {
   function animate() {
     requestAnimationFrame(animate);
 
-    const spherePosition = sphere.position.clone();
-    const cameraPosition = camera.position.clone();
+    rotateOnCameraZ(sphere, camera);
 
-    const direction = new THREE.Vector3();
-
-    direction.subVectors(cameraPosition, spherePosition).normalize();
-    sphere.rotateOnAxis(direction, -rotationDelta * 0.05);
-
+    // Needed for updating all manual changes to the camera.
     controls.update();
 
     renderer.render(scene, camera);
@@ -93,12 +99,27 @@ function main() {
 
 main();
 
+/**
+ * Substracts camera pos from sphere pos to calc correct angle to rotate sphere on.
+ * @param object A mesh object to rotate.
+ * @param camera A camera object as relative position to the rotating object.
+ */
+function rotateOnCameraZ(object: Mesh, camera: PerspectiveCamera) {
+  const spherePosition = object.position.clone();
+  const cameraPosition = camera.position.clone();
+
+  const direction = new Vector3();
+
+  direction.subVectors(cameraPosition, spherePosition).normalize();
+  object.rotateOnAxis(direction, -rotationDelta * 0.03);
+}
+
 function setupControls(
-  camera: THREE.Camera,
+  camera: PerspectiveCamera,
   element?: HTMLElement | undefined
 ) {
   const controls = new OrbitControls(camera, element);
-  controls.minDistance = SPHERE_RADIUS * 2;
+  controls.minDistance = SPHERE_RADIUS + 3;
   controls.maxDistance = 100;
   controls.enablePan = false;
 
