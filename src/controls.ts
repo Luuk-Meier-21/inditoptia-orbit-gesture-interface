@@ -26,7 +26,7 @@ export function setupControls(
   element?: HTMLElement | undefined
 ) {
   const controls = new OrbitControls(camera, element);
-  controls.zoomSpeed = 1;
+  controls.zoomSpeed = 0.75;
   controls.rotateSpeed = 0.5;
   controls.minDistance = OFFSET_MIN;
   controls.maxDistance = OFFSET_MAX;
