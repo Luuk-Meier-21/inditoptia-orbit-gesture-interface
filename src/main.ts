@@ -1,102 +1,109 @@
 import {
   Mesh,
   MeshBasicMaterial,
+  MeshBasicMaterialParameters,
   PerspectiveCamera,
+  Raycaster,
   Scene,
   SphereGeometry,
+  Vector2,
   Vector3,
   WebGLRenderer,
 } from "three";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
+import {TouchHelper, latLngToVector, random} from "./functions";
 
 const SPHERE_RADIUS = 15;
+const TARGET_RADIUS = 1;
 
-let prevRotation = 0;
-let rotationDelta = 0;
+const OFFSET_INITIAL = 300;
+const OFFSET_MIN = 50;
+const OFFSET_MAX = 500;
 
-function getAngle(event: TouchEvent & {rotation?: number}): [number, number] {
-  let rotation = event.rotation;
+const pointer = new Vector2();
+const raycaster = new Raycaster();
+raycaster.layers.enableAll();
 
-  // This isn't a fun browser!
-  if (!rotation) {
-    rotation =
-      (Math.atan2(
-        event.touches[0].pageY - event.touches[1].pageY,
-        event.touches[0].pageX - event.touches[1].pageX
-      ) *
-        180) /
-      Math.PI;
-  }
+const scene = new Scene();
+const camera = new PerspectiveCamera(
+  10,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+camera.position.set(0, 0, OFFSET_INITIAL);
 
-  return [rotation, rotation - prevRotation];
+const renderer = new WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+const canvas = document.body.appendChild(renderer.domElement);
+const controls = setupControls(camera, canvas);
+const touch = new TouchHelper(canvas);
+
+const largeSphere = createSphere(SPHERE_RADIUS, 32, "globe", {
+  color: 0x3ac4ff,
+  wireframe: true,
+});
+largeSphere.layers.enable(2);
+scene.add(largeSphere);
+
+for (let _ in Array.from(Array(3))) {
+  const targetSphere = createSphere(TARGET_RADIUS, 16, "target", {
+    color: 0xef3aff,
+  });
+  const latRand = random(-90, 90);
+  const lgnRand = random(-180, 180);
+  const av = latLngToVector(latRand, lgnRand, SPHERE_RADIUS, 0);
+  targetSphere.position.set(av.x, av.y, av.z);
+  targetSphere.layers.enable(1);
+  scene.add(targetSphere);
 }
 
-function main() {
-  const scene = new Scene();
-  const camera = new PerspectiveCamera(
-    75,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-  );
-  camera.position.set(0, 0, 50);
+const DEBOUNCE_MILISEC = 2000;
+let currDebounceId: number | undefined;
+function animate() {
+  requestAnimationFrame(animate);
 
-  // camera.up.set(0, 0, 1); // <=== spin around Z-axis
+  rotateOnCameraZ(largeSphere, camera);
 
-  const renderer = new WebGLRenderer();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  // Needed for updating all manual changes to the camera.
+  controls.update();
 
-  const canvas = document.body.appendChild(renderer.domElement);
-  const controls = setupControls(camera, canvas);
-  const geometry = new SphereGeometry(SPHERE_RADIUS, 32, 16);
-  console.log(geometry.getAttribute("position"));
+  renderer.render(scene, camera);
 
-  const material = new MeshBasicMaterial({
-    color: 0x3ac4ff,
-    wireframe: true,
-  });
+  // Run raycast after render.
+  raycaster.setFromCamera(pointer, camera);
 
-  const sphere = new Mesh(geometry, material);
-  scene.add(sphere);
+  const intersects = raycaster.intersectObjects(scene.children);
+  if (intersects.length > 0) {
+    const isHoveringTarget = intersects[0].object.layers.isEnabled(1);
 
-  canvas.addEventListener("touchstart", (event) => {
-    const [curr] = getAngle(event);
-    rotationDelta = 0;
-    prevRotation = curr;
-  });
-
-  canvas.addEventListener("touchend", () => {
-    rotationDelta = 0;
-    prevRotation = 0;
-  });
-
-  canvas.addEventListener(
-    "touchmove",
-    (event: TouchEvent & {rotation?: number}) => {
-      if (event.touches.length > 1) {
-        const [curr, delta] = getAngle(event);
-
-        rotationDelta = delta;
-        prevRotation = curr;
+    if (isHoveringTarget) {
+      if (!currDebounceId) {
+        console.log("Yes keep hovering!");
+        currDebounceId = setTimeout(() => {
+          console.log("Succes!");
+          intersects[0].object.material.color.setHex(0x3ac4ff);
+        }, DEBOUNCE_MILISEC);
+      }
+    } else {
+      if (currDebounceId) {
+        console.log("Not enough hover time");
+        clearTimeout(currDebounceId);
+        currDebounceId = undefined;
       }
     }
-  );
-
-  function animate() {
-    requestAnimationFrame(animate);
-
-    rotateOnCameraZ(sphere, camera);
-
-    // Needed for updating all manual changes to the camera.
-    controls.update();
-
-    renderer.render(scene, camera);
   }
-
-  animate();
 }
 
-main();
+function onPointerMove(event: PointerEvent) {
+  pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+}
+
+animate();
+
+window.addEventListener("pointermove", onPointerMove);
 
 /**
  * Substracts camera pos from sphere pos to calc correct angle to rotate sphere on.
@@ -110,7 +117,7 @@ function rotateOnCameraZ(object: Mesh, camera: PerspectiveCamera) {
   const direction = new Vector3();
 
   direction.subVectors(cameraPosition, spherePosition).normalize();
-  object.rotateOnAxis(direction, -rotationDelta * 0.03);
+  object.rotateOnAxis(direction, -touch.rotationDelta * 0.03);
 }
 
 function setupControls(
@@ -118,9 +125,24 @@ function setupControls(
   element?: HTMLElement | undefined
 ) {
   const controls = new OrbitControls(camera, element);
-  controls.minDistance = SPHERE_RADIUS + 3;
-  controls.maxDistance = 100;
+  controls.minDistance = OFFSET_MIN;
+  controls.maxDistance = OFFSET_MAX;
   controls.enablePan = false;
 
   return controls;
+}
+
+function createSphere(
+  radius: number,
+  segmentDetail: number,
+  name: string,
+  materialOptions?: MeshBasicMaterialParameters
+): Mesh {
+  const geometry = new SphereGeometry(radius, segmentDetail, segmentDetail / 2);
+  const material = new MeshBasicMaterial(materialOptions);
+  const mesh = new Mesh(geometry, material);
+
+  mesh.name = name;
+
+  return mesh;
 }
