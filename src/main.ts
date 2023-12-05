@@ -1,7 +1,9 @@
 import {
+  Group,
   Mesh,
   MeshBasicMaterial,
   MeshBasicMaterialParameters,
+  Object3D,
   PerspectiveCamera,
   Raycaster,
   Scene,
@@ -10,15 +12,16 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three";
-import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
 import {TouchHelper, latLngToVector, random} from "./functions";
+import {rotateOnCameraZ, setupControls} from "./controls";
+import {createSphere} from "./object";
 
-const SPHERE_RADIUS = 15;
-const TARGET_RADIUS = 1;
+export const SPHERE_RADIUS = 15;
+export const TARGET_RADIUS = 1;
 
-const OFFSET_INITIAL = 300;
-const OFFSET_MIN = 50;
-const OFFSET_MAX = 500;
+export const OFFSET_INITIAL = 300;
+export const OFFSET_MIN = 50;
+export const OFFSET_MAX = 500;
 
 const pointer = new Vector2();
 const raycaster = new Raycaster();
@@ -45,7 +48,9 @@ const largeSphere = createSphere(SPHERE_RADIUS, 32, "globe", {
   wireframe: true,
 });
 largeSphere.layers.enable(2);
-scene.add(largeSphere);
+
+const group = new Group();
+group.add(largeSphere);
 
 for (let _ in Array.from(Array(3))) {
   const targetSphere = createSphere(TARGET_RADIUS, 16, "target", {
@@ -56,15 +61,17 @@ for (let _ in Array.from(Array(3))) {
   const av = latLngToVector(latRand, lgnRand, SPHERE_RADIUS, 0);
   targetSphere.position.set(av.x, av.y, av.z);
   targetSphere.layers.enable(1);
-  scene.add(targetSphere);
+  group.add(targetSphere);
 }
 
-const DEBOUNCE_MILISEC = 2000;
+scene.add(group);
+
+const DEBOUNCE_MILISEC = 1000;
 let currDebounceId: number | undefined;
 function animate() {
   requestAnimationFrame(animate);
 
-  rotateOnCameraZ(largeSphere, camera);
+  rotateOnCameraZ(group, camera, touch.rotationDelta);
 
   // Needed for updating all manual changes to the camera.
   controls.update();
@@ -105,45 +112,3 @@ function onPointerMove(event: PointerEvent) {
 animate();
 
 window.addEventListener("pointermove", onPointerMove);
-
-/**
- * Substracts camera pos from sphere pos to calc correct angle to rotate sphere on.
- * @param object A mesh object to rotate.
- * @param camera A camera object as relative position to the rotating object.
- */
-function rotateOnCameraZ(object: Mesh, camera: PerspectiveCamera) {
-  const spherePosition = object.position.clone();
-  const cameraPosition = camera.position.clone();
-
-  const direction = new Vector3();
-
-  direction.subVectors(cameraPosition, spherePosition).normalize();
-  object.rotateOnAxis(direction, -touch.rotationDelta * 0.03);
-}
-
-function setupControls(
-  camera: PerspectiveCamera,
-  element?: HTMLElement | undefined
-) {
-  const controls = new OrbitControls(camera, element);
-  controls.minDistance = OFFSET_MIN;
-  controls.maxDistance = OFFSET_MAX;
-  controls.enablePan = false;
-
-  return controls;
-}
-
-function createSphere(
-  radius: number,
-  segmentDetail: number,
-  name: string,
-  materialOptions?: MeshBasicMaterialParameters
-): Mesh {
-  const geometry = new SphereGeometry(radius, segmentDetail, segmentDetail / 2);
-  const material = new MeshBasicMaterial(materialOptions);
-  const mesh = new Mesh(geometry, material);
-
-  mesh.name = name;
-
-  return mesh;
-}
