@@ -83,6 +83,7 @@ function animate() {
         console.log("Yes keep hovering!");
         currDebounceId = setTimeout(() => {
           console.log("Succes!");
+          // @ts-ignore
           intersects[0].object.material.color.setHex(0x3ac4ff);
         }, DEBOUNCE_MILISEC);
       }
