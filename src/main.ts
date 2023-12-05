@@ -52,7 +52,7 @@ function main() {
   console.log(geometry.getAttribute("position"));
 
   const material = new MeshBasicMaterial({
-    color: 0xff4f00,
+    color: 0x3ac4ff,
     wireframe: true,
   });
 
