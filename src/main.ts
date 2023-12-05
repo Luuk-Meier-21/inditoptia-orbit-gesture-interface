@@ -1,4 +1,3 @@
-import * as threeDebug from "three";
 import {
   Mesh,
   MeshBasicMaterial,
