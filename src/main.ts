@@ -1,15 +1,9 @@
 import {
   Group,
-  Mesh,
-  MeshBasicMaterial,
-  MeshBasicMaterialParameters,
-  Object3D,
   PerspectiveCamera,
   Raycaster,
   Scene,
-  SphereGeometry,
   Vector2,
-  Vector3,
   WebGLRenderer,
 } from "three";
 import {TouchHelper, latLngToVector, random} from "./functions";
@@ -157,7 +151,7 @@ function animate() {
     completedTargetCount = 0;
     group.children
       .filter((child) => child.layers.isEnabled(Layers.TARGET))
-      .forEach((child) => {
+      .forEach((_) => {
         // @ts-ignore
         intersects[0].object.material.color.setHex(0xff3a3a);
       });
